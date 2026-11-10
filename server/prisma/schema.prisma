@@ -1,0 +1,66 @@
+// Tells Prisma to generate a JavaScript client we can use in our code
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Tells Prisma which database to use and where to find its address
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // reads DATABASE_URL from server/.env
+}
+
+// Our models (User, Project, Task) come in the next tasks
+// Our models (Project and Task come in the next task)
+
+// One row in the "User" table = one person with an account
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  projects     Project[] // NEW: all projects owned by this user (not a real column)
+}
+
+// Enums = a fixed list of allowed values. Anything else is rejected.
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String? // the ? means optional (can be empty)
+  createdAt   DateTime @default(now())
+
+  // ownerId is the foreign key: it stores the id of the User who owns this project
+  ownerId Int
+  // This line tells Prisma how ownerId connects to User.
+  // onDelete: Cascade = if the user is deleted, their projects are deleted too.
+  owner   User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  tasks Task[] // all tasks inside this project (not a real column)
+}
+
+model Task {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO) // new tasks start as TODO
+  priority    Priority   @default(MEDIUM) // new tasks start as MEDIUM
+  dueDate     DateTime? // optional deadline
+  createdAt   DateTime   @default(now())
+
+  // projectId is the foreign key pointing to the Project this task belongs to
+  projectId Int
+  // onDelete: Cascade = deleting a project also deletes its tasks
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
