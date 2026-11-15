@@ -1,9 +1,10 @@
 const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
-const prisma = require('./db') // our shared database client
+const prisma = require('./db')
 const authRoutes = require('./routes/auth')
 const projectRoutes = require('./routes/projects')
+const taskRoutes = require('./routes/tasks')
 
 const app = express()
 
@@ -11,26 +12,25 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// ---------- Routes (all routes must be ABOVE the 404 handler) ----------
+// ---------- Routes (all ABOVE the 404 handler) ----------
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'TeamFlow API is running' })
 })
 
-// Proves the server can talk to the database
 app.get('/api/health/db', async (req, res, next) => {
   try {
     const userCount = await prisma.user.count()
     res.json({ status: 'ok', users: userCount })
   } catch (err) {
-    next(err) // send the error to the central error handler below
+    next(err)
   }
 })
-// Every route in auth.js now starts with /api/auth
-app.use('/api/auth', authRoutes)
-// Every route in projects.js now starts with /api/projects
-app.use('/api/projects', projectRoutes)
 
-// ---------- 404 handler (runs only if no route above matched) ----------
+app.use('/api/auth', authRoutes)
+app.use('/api/projects', projectRoutes)
+app.use('/api/tasks', taskRoutes)
+
+// ---------- 404 handler ----------
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' })
 })
