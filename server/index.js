@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
 const prisma = require('./db') // our shared database client
+const authRoutes = require('./routes/auth')
 
 const app = express()
 
@@ -23,6 +24,8 @@ app.get('/api/health/db', async (req, res, next) => {
     next(err) // send the error to the central error handler below
   }
 })
+// Every route in auth.js now starts with /api/auth
+app.use('/api/auth', authRoutes)
 
 // ---------- 404 handler (runs only if no route above matched) ----------
 app.use((req, res) => {
