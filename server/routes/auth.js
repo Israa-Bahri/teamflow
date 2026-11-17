@@ -3,23 +3,23 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken') // creates the login tokens
 const prisma = require('../db')
 const requireAuth = require('../middleware/auth')
+const { LIMITS, checkRequiredText, checkEmail, checkPassword } = require('../validators')
 
 const router = express.Router()
 
 // ---------- POST /api/auth/register ----------
 router.post('/register', async (req, res, next) => {
   try {
-    const { name, email, password } = req.body
+    // "|| {}" means: if no body was sent at all, use an empty object
+    const { name, email, password } = req.body || {}
 
-    // Reject missing or invalid input (400 = bad request)
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email and password are required' })
-    }
-    if (!email.includes('@')) {
-      return res.status(400).json({ error: 'Please enter a valid email' })
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    // Check every field. "||" gives the first problem found, or null if none.
+    const problem =
+      checkRequiredText(name, 'Name', LIMITS.name) ||
+      checkEmail(email) ||
+      checkPassword(password)
+    if (problem) {
+      return res.status(400).json({ error: problem }) // 400 = bad request
     }
 
     // Clean the email so capital letters and spaces don't matter
@@ -42,17 +42,17 @@ router.post('/register', async (req, res, next) => {
     // 201 = created. Never send passwordHash back.
     res.status(201).json({ id: user.id, name: user.name, email: user.email })
   } catch (err) {
-    next(err)
+    next(err) // any unexpected error goes to the central error handler
   }
 })
 
 // ---------- POST /api/auth/login ----------
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body
+    const { email, password } = req.body || {}
 
-    // Both fields are required
-    if (!email || !password) {
+    // Both must be non-empty text (a number or object would crash .trim() below)
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return res.status(400).json({ error: 'Email and password are required' })
     }
 
@@ -84,6 +84,7 @@ router.post('/login', async (req, res, next) => {
     next(err)
   }
 })
+
 // ---------- GET /api/auth/me (private) ----------
 // requireAuth runs first. If the token is bad, the code below never runs.
 router.get('/me', requireAuth, async (req, res, next) => {
@@ -98,4 +99,5 @@ router.get('/me', requireAuth, async (req, res, next) => {
     next(err)
   }
 })
+
 module.exports = router

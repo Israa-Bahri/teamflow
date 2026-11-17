@@ -5,7 +5,7 @@ const prisma = require('./db')
 const authRoutes = require('./routes/auth')
 const projectRoutes = require('./routes/projects')
 const taskRoutes = require('./routes/tasks')
-
+const statsRoutes = require('./routes/stats')
 const app = express()
 
 // ---------- Middleware ----------
@@ -29,6 +29,8 @@ app.get('/api/health/db', async (req, res, next) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/projects', projectRoutes)
 app.use('/api/tasks', taskRoutes)
+// Every route in stats.js now starts with /api/stats
+app.use('/api/stats', statsRoutes)
 
 // ---------- 404 handler ----------
 app.use((req, res) => {

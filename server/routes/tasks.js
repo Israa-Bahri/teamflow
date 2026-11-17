@@ -1,6 +1,7 @@
 const express = require('express')
 const prisma = require('../db')
 const requireAuth = require('../middleware/auth')
+const { LIMITS, checkRequiredText, checkOptionalText } = require('../validators')
 
 const router = express.Router()
 
@@ -43,20 +44,21 @@ async function findOwnedTask(req, res) {
 router.patch('/:id', async (req, res, next) => {
   try {
     const task = await findOwnedTask(req, res)
-    if (!task) return
+    if (!task) return // the helper already replied
 
-    const { title, description, status, priority, dueDate } = req.body
+    const { title, description, status, priority, dueDate } = req.body || {}
     const data = {} // we collect only the fields to change
 
     if (title !== undefined) {
-      if (typeof title !== 'string' || !title.trim()) {
-        return res.status(400).json({ error: 'Title cannot be empty' })
-      }
+      const problem = checkRequiredText(title, 'Title', LIMITS.title)
+      if (problem) return res.status(400).json({ error: problem })
       data.title = title.trim()
     }
 
     if (description !== undefined) {
-      data.description = description ? String(description).trim() : null
+      const problem = checkOptionalText(description, 'Description', LIMITS.description)
+      if (problem) return res.status(400).json({ error: problem })
+      data.description = description ? description.trim() : null
     }
 
     if (status !== undefined) {

@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react'
 import api from '../api/client'
 import ProjectForm from '../components/ProjectForm'
+import { Loading, ErrorBox, EmptyState } from '../components/StatusMessages'
 
 function Projects() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
-
-  // A feedback message shown above the list: { type: 'success' | 'error', text: '...' }
-  // It's separate from "error" so a failed delete doesn't replace the whole page.
-  const [notice, setNotice] = useState(null)
+  const [notice, setNotice] = useState(null) // { type: 'success' | 'error', text }
 
   async function loadProjects() {
     try {
@@ -44,16 +42,15 @@ function Projects() {
   async function handleDelete(project) {
     setNotice(null)
 
-    // confirm() shows the browser's OK / Cancel box. Cancel returns false.
     const ok = window.confirm(
       'Delete "' + project.title + '"? Its tasks will be deleted too. This cannot be undone.'
     )
-    if (!ok) return // the user changed their mind, so do nothing
+    if (!ok) return
 
     try {
       await api.delete('/projects/' + project.id)
       setNotice({ type: 'success', text: '"' + project.title + '" was deleted' })
-      await loadProjects() // refresh the list so it disappears
+      await loadProjects()
     } catch (err) {
       setNotice({
         type: 'error',
@@ -62,23 +59,17 @@ function Projects() {
     }
   }
 
-  if (loading) {
-    return <p className="text-slate-500">Loading projects...</p>
-  }
-
-  if (error) {
-    return <p className="bg-red-100 text-red-700 rounded px-3 py-2">{error}</p>
-  }
+  if (loading) return <Loading text="Loading projects..." />
+  if (error) return <ErrorBox message={error} />
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Projects</h1>
 
-      {/* Feedback message: green for success, red for error */}
       {notice && (
         <p
           className={
-            'rounded px-3 py-2 text-sm ' +
+            'rounded px-3 py-2 text-sm break-words ' +
             (notice.type === 'success'
               ? 'bg-green-100 text-green-700'
               : 'bg-red-100 text-red-700')
@@ -88,15 +79,16 @@ function Projects() {
         </p>
       )}
 
-      {/* Create form */}
       <div className="bg-white rounded shadow p-4">
         <h2 className="font-semibold mb-3">New project</h2>
         <ProjectForm onSubmit={handleCreate} submitLabel="Create project" resetOnSuccess />
       </div>
 
-      {/* List */}
       {projects.length === 0 ? (
-        <p className="text-slate-500">No projects yet. Create your first one above!</p>
+        <EmptyState
+          title="No projects yet"
+          message="Create your first one using the form above."
+        />
       ) : (
         <ul className="space-y-3">
           {projects.map((p) => (
@@ -109,8 +101,11 @@ function Projects() {
                   submitLabel="Save changes"
                 />
               ) : (
-                <div className="flex justify-between items-start gap-4">
-                  <div>
+                // On phones the buttons go BELOW the text (flex-col);
+                // from the "sm" size up they sit beside it (sm:flex-row).
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                  {/* min-w-0 + break-words stop a long title from stretching the card */}
+                  <div className="min-w-0 break-words">
                     <h2 className="font-semibold">{p.title}</h2>
                     {p.description && <p className="text-slate-500">{p.description}</p>}
                     <p className="text-xs text-slate-400 mt-2">
@@ -118,7 +113,8 @@ function Projects() {
                     </p>
                   </div>
 
-                  <div className="flex gap-2">
+                  {/* shrink-0 keeps the buttons from being squashed */}
+                  <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => setEditingId(p.id)}
                       className="text-sm bg-slate-200 hover:bg-slate-300 rounded px-3 py-1"

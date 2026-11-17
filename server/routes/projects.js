@@ -1,8 +1,9 @@
 const express = require('express')
 const prisma = require('../db')
 const requireAuth = require('../middleware/auth')
+const { LIMITS, checkRequiredText, checkOptionalText } = require('../validators')
 
-// 1. The router must be created BEFORE any router.get / router.post line
+// The router must be created BEFORE any router.get / router.post line
 const router = express.Router()
 
 // Every route in this file needs a logged-in user
@@ -12,9 +13,10 @@ router.use(requireAuth)
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH']
 
 // Helper used by PATCH, DELETE and the task routes:
-// finds the project and checks the owner.
+// finds the project and checks that it belongs to the logged-in user.
 // If something is wrong it sends the error reply itself and returns null.
 async function findOwnedProject(req, res) {
+  // req.params.id is text from the URL, so turn it into a number
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: 'Invalid project id' })
@@ -27,6 +29,7 @@ async function findOwnedProject(req, res) {
     return null
   }
 
+  // The owner saved in the database must match the logged-in user (from the token)
   if (project.ownerId !== req.userId) {
     res.status(403).json({ error: 'You do not own this project' })
     return null
@@ -38,16 +41,22 @@ async function findOwnedProject(req, res) {
 // ---------- POST /api/projects ----------
 router.post('/', async (req, res, next) => {
   try {
-    const { title, description } = req.body
+    const { title, description } = req.body || {}
 
-    if (!title || typeof title !== 'string' || !title.trim()) {
-      return res.status(400).json({ error: 'Title is required' })
+    // Validate the text fields (required title, optional description)
+    const problem =
+      checkRequiredText(title, 'Title', LIMITS.title) ||
+      checkOptionalText(description, 'Description', LIMITS.description)
+    if (problem) {
+      return res.status(400).json({ error: problem })
     }
 
+    // ownerId comes from the token, NOT from req.body,
+    // so a user can't create projects for someone else.
     const project = await prisma.project.create({
       data: {
         title: title.trim(),
-        description: description ? String(description).trim() : null,
+        description: description ? description.trim() : null,
         ownerId: req.userId,
       },
     })
@@ -62,8 +71,8 @@ router.post('/', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const projects = await prisma.project.findMany({
-      where: { ownerId: req.userId },
-      orderBy: { createdAt: 'desc' },
+      where: { ownerId: req.userId }, // only the logged-in user's projects
+      orderBy: { createdAt: 'desc' }, // newest first
     })
 
     res.json(projects)
@@ -73,25 +82,29 @@ router.get('/', async (req, res, next) => {
 })
 
 // ---------- PATCH /api/projects/:id ----------
+// Changes only the fields you send
 router.patch('/:id', async (req, res, next) => {
   try {
     const project = await findOwnedProject(req, res)
-    if (!project) return
+    if (!project) return // the helper already replied (400, 404 or 403)
 
-    const { title, description } = req.body
-    const data = {}
+    const { title, description } = req.body || {}
+    const data = {} // we collect only the fields to change
 
     if (title !== undefined) {
-      if (typeof title !== 'string' || !title.trim()) {
-        return res.status(400).json({ error: 'Title cannot be empty' })
-      }
+      const problem = checkRequiredText(title, 'Title', LIMITS.title)
+      if (problem) return res.status(400).json({ error: problem })
       data.title = title.trim()
     }
 
     if (description !== undefined) {
-      data.description = description ? String(description).trim() : null
+      const problem = checkOptionalText(description, 'Description', LIMITS.description)
+      if (problem) return res.status(400).json({ error: problem })
+      // An empty description is saved as null (nothing)
+      data.description = description ? description.trim() : null
     }
 
+    // Nothing to change
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'Nothing to update' })
     }
@@ -123,19 +136,26 @@ router.delete('/:id', async (req, res, next) => {
 // ---------- POST /api/projects/:id/tasks ----------
 router.post('/:id/tasks', async (req, res, next) => {
   try {
+    // Ownership is checked through the project
     const project = await findOwnedProject(req, res)
     if (!project) return
 
-    const { title, description, priority, dueDate } = req.body
+    const { title, description, priority, dueDate } = req.body || {}
 
-    if (!title || typeof title !== 'string' || !title.trim()) {
-      return res.status(400).json({ error: 'Title is required' })
+    // Validate the text fields
+    const problem =
+      checkRequiredText(title, 'Title', LIMITS.title) ||
+      checkOptionalText(description, 'Description', LIMITS.description)
+    if (problem) {
+      return res.status(400).json({ error: problem })
     }
 
+    // Priority is optional, but if sent it must be one of the three allowed values
     if (priority !== undefined && !PRIORITIES.includes(priority)) {
       return res.status(400).json({ error: 'Priority must be LOW, MEDIUM or HIGH' })
     }
 
+    // Due date is optional, but if sent it must be a real date
     let due = null
     if (dueDate) {
       due = new Date(dueDate)
@@ -147,10 +167,10 @@ router.post('/:id/tasks', async (req, res, next) => {
     const task = await prisma.task.create({
       data: {
         title: title.trim(),
-        description: description ? String(description).trim() : null,
-        priority: priority,
+        description: description ? description.trim() : null,
+        priority: priority, // if undefined, the database default (MEDIUM) is used
         dueDate: due,
-        projectId: project.id,
+        projectId: project.id, // links the task to the project
       },
     })
 
@@ -168,7 +188,7 @@ router.get('/:id/tasks', async (req, res, next) => {
 
     const tasks = await prisma.task.findMany({
       where: { projectId: project.id },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'asc' }, // oldest first, so the board keeps a stable order
     })
 
     res.json(tasks)

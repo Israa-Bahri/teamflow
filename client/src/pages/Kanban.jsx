@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import api from '../api/client'
 import TaskForm from '../components/TaskForm'
 import TaskCard from '../components/TaskCard'
+import { Loading, ErrorBox, EmptyState } from '../components/StatusMessages'
 
 const COLUMNS = [
   { status: 'TODO', label: 'To Do' },
@@ -16,10 +16,7 @@ function Kanban() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  // A message for a failed status change. It's separate from "error"
-  // so the board stays on screen when one change fails.
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState('') // message for a failed status change
 
   useEffect(() => {
     async function loadProjects() {
@@ -57,34 +54,28 @@ function Kanban() {
     await loadTasks(projectId)
   }
 
-  // Called by a TaskCard when its dropdown changes
   async function handleStatusChange(taskId, newStatus) {
     setNotice('')
     try {
-      // Save the new status on the server. The server replies with the updated task.
       const res = await api.patch('/tasks/' + taskId, { status: newStatus })
-
-      // Update the list in React state WITHOUT changing the old array:
-      // map() builds a new array where only the changed task is replaced.
+      // Build a new array where only the changed task is replaced
       setTasks((oldTasks) => oldTasks.map((t) => (t.id === taskId ? res.data : t)))
     } catch (err) {
       setNotice(err.response?.data?.error || 'Could not change the status')
     }
   }
 
-  if (loading) {
-    return <p className="text-slate-500">Loading...</p>
-  }
-
-  if (error) {
-    return <p className="bg-red-100 text-red-700 rounded px-3 py-2">{error}</p>
-  }
+  if (loading) return <Loading text="Loading board..." />
+  if (error) return <ErrorBox message={error} />
 
   if (projects.length === 0) {
     return (
-      <p className="text-slate-500">
-        You need a project first. <Link to="/projects" className="text-blue-600">Create one</Link>
-      </p>
+      <EmptyState
+        title="No projects yet"
+        message="Tasks live inside projects, so create a project first."
+        actionLabel="Create a project"
+        actionTo="/projects"
+      />
     )
   }
 
@@ -92,10 +83,11 @@ function Kanban() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Kanban</h1>
 
+      {/* A select is as wide as its longest option, so we cap it at the screen width */}
       <select
         value={projectId}
         onChange={(e) => setProjectId(e.target.value)}
-        className="border rounded px-3 py-2 bg-white"
+        className="border rounded px-3 py-2 bg-white w-full sm:w-auto max-w-full"
       >
         {projects.map((p) => (
           <option key={p.id} value={p.id}>
@@ -109,14 +101,16 @@ function Kanban() {
         <TaskForm onSubmit={handleCreate} />
       </div>
 
-      {notice && <p className="bg-red-100 text-red-700 rounded px-3 py-2 text-sm">{notice}</p>}
+      {notice && (
+        <p className="bg-red-100 text-red-700 rounded px-3 py-2 text-sm">{notice}</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {COLUMNS.map((col) => {
           const columnTasks = tasks.filter((t) => t.status === col.status)
 
           return (
-            <div key={col.status} className="bg-slate-200 rounded p-3 space-y-3">
+            <div key={col.status} className="bg-slate-200 rounded p-3 space-y-3 min-w-0">
               <h2 className="font-semibold">
                 {col.label} ({columnTasks.length})
               </h2>

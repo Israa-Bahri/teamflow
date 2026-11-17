@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
@@ -22,6 +22,10 @@ function App() {
       {/* Public pages: anyone can open these */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+
+      {/* "*" matches any other URL. We send the visitor to the home page.
+          The guard then sends them to /login if they aren't logged in. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

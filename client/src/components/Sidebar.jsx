@@ -1,23 +1,23 @@
 import { Link } from 'react-router-dom'
 
-// A plain array of links. To add a menu item later, add one line here.
+// To add a menu item later, add one line here.
 const links = [
   { label: 'Dashboard', to: '/' },
-  { label: 'Projects', to: '/projects' }, // page comes in Task 7
-  { label: 'Kanban', to: '/kanban' },     // page comes in Task 7
+  { label: 'Projects', to: '/projects' },
+  { label: 'Kanban', to: '/kanban' },
 ]
 
 function Sidebar() {
   return (
-    // w-full on phones (sits on top), md:w-56 on bigger screens (side column)
-    <aside className="w-full md:w-56 bg-slate-800 text-white p-4">
-      <h2 className="text-xl font-bold mb-4">TeamFlow</h2>
+    // On phones it's a bar across the top; on desktop (md:) a column on the left
+    <aside className="w-full md:w-56 bg-slate-800 text-white p-3 md:p-4">
+      <h2 className="text-xl font-bold mb-2 md:mb-4">TeamFlow</h2>
 
-      <nav className="flex md:flex-col gap-2">
-        {/* .map() turns each item in the array into a <Link> */}
+      {/* flex-wrap lets the links wrap onto a second line on very narrow screens */}
+      <nav className="flex flex-wrap md:flex-col gap-2">
         {links.map((item) => (
           <Link
-            key={item.to} // React needs a unique key for list items
+            key={item.to}
             to={item.to}
             className="px-3 py-2 rounded hover:bg-slate-700"
           >
