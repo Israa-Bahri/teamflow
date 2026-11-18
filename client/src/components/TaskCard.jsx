@@ -19,9 +19,10 @@ const STATUS_OPTIONS = [
 //   task            the task to show
 //   dragging        true while THIS card is being dragged (it fades out)
 //   onStatusChange  called with (task id, new status) when the menu changes
+//   onEdit          called with the task when the pencil button is clicked
 //   onDragStart     called with the task id when a drag begins
 //   onDragEnd       called when the drag finishes
-function TaskCard({ task, dragging, onStatusChange, onDragStart, onDragEnd }) {
+function TaskCard({ task, dragging, onStatusChange, onEdit, onDragStart, onDragEnd }) {
   // Today at midnight (UTC). A due date before it, on an unfinished task, is overdue.
   const todayUtc = new Date(new Date().toISOString().slice(0, 10))
   const overdue =
@@ -43,15 +44,38 @@ function TaskCard({ task, dragging, onStatusChange, onDragStart, onDragEnd }) {
         (dragging ? 'opacity-40' : '')
       }
     >
-      {/* A finished task gets a line through its title */}
-      <h3
-        className={
-          'font-medium break-words ' +
-          (task.status === 'DONE' ? 'line-through text-muted' : '')
-        }
-      >
-        {task.title}
-      </h3>
+      {/* Top row: the title, and the edit button on the right */}
+      <div className="flex items-start justify-between gap-2">
+        {/* A finished task gets a line through its title */}
+        <h3
+          className={
+            'min-w-0 font-medium break-words ' +
+            (task.status === 'DONE' ? 'line-through text-muted' : '')
+          }
+        >
+          {task.title}
+        </h3>
+
+        <button
+          type="button"
+          onClick={() => onEdit(task)}
+          aria-label={'Edit task: ' + task.title}
+          className="shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-clay/10 hover:text-clay"
+        >
+          {/* A pencil icon */}
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+          </svg>
+        </button>
+      </div>
 
       {task.description && (
         <p className="mt-1 text-sm text-muted break-words line-clamp-3">{task.description}</p>

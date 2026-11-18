@@ -83,7 +83,7 @@ function Register() {
           type="email"
           name="email"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder="you@gmail.com"
           value={form.email}
           onChange={handleChange}
         />

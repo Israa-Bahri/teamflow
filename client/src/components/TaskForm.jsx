@@ -7,15 +7,23 @@ const PRIORITIES = [
   { value: 'HIGH', label: 'High' },
 ]
 
-// The form inside the "New task" pop-up.
-// Props: onSubmit (what saving does), onCancel (closes the pop-up).
-function TaskForm({ onSubmit, onCancel }) {
-  const [values, setValues] = useState({
-    title: '',
-    description: '',
-    priority: 'MEDIUM', // new tasks start at medium priority
-    dueDate: '',
-  })
+// What the form looks like when creating a new task
+const EMPTY = { title: '', description: '', priority: 'MEDIUM', dueDate: '' }
+
+// Props:
+//   initialValues  what the inputs start with (empty for new, the task for edit)
+//   onSubmit       what saving does
+//   onCancel       closes the pop-up
+//   onDelete       optional: if given, a Delete task button appears (used when editing)
+//   submitLabel    text on the save button
+function TaskForm({
+  initialValues = EMPTY,
+  onSubmit,
+  onCancel,
+  onDelete,
+  submitLabel = 'Add task',
+}) {
+  const [values, setValues] = useState(initialValues)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const descriptionId = useId()
@@ -26,7 +34,7 @@ function TaskForm({ onSubmit, onCancel }) {
   }
 
   async function handleSubmit(e) {
-    e.preventDefault() // don't reload the page
+    e.preventDefault() // stop the browser from reloading the page
     setError('')
 
     if (!values.title.trim()) {
@@ -82,7 +90,7 @@ function TaskForm({ onSubmit, onCancel }) {
         <div role="group" aria-label="Priority" className="flex gap-2">
           {PRIORITIES.map((p) => (
             <button
-              type="button" // so clicking doesn't submit the form
+              type="button"
               key={p.value}
               aria-pressed={values.priority === p.value}
               onClick={() => setValues({ ...values, priority: p.value })}
@@ -107,21 +115,36 @@ function TaskForm({ onSubmit, onCancel }) {
         onChange={handleChange}
       />
 
-      <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-full border border-sand px-5 py-2 font-medium transition-colors hover:border-ink"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-full bg-clay px-5 py-2 font-semibold text-paper transition hover:bg-clay-dark active:scale-95 disabled:opacity-60"
-        >
-          {saving ? 'Adding...' : 'Add task'}
-        </button>
+      {/* Footer: Delete on the left (only when editing), Cancel and Save on the right */}
+      <div className="flex items-center justify-between gap-2 pt-2">
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-full px-4 py-2 text-sm font-medium text-clay transition-colors hover:bg-clay/10"
+          >
+            Delete task
+          </button>
+        ) : (
+          <span />
+        )}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-sand px-5 py-2 font-medium transition-colors hover:border-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-full bg-clay px-5 py-2 font-semibold text-paper transition hover:bg-clay-dark active:scale-95 disabled:opacity-60"
+          >
+            {saving ? 'Saving...' : submitLabel}
+          </button>
+        </div>
       </div>
     </form>
   )

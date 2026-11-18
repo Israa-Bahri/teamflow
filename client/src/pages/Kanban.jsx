@@ -21,10 +21,14 @@ function Kanban() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showForm, setShowForm] = useState(false) // is the "New task" pop-up open?
   const [draggingId, setDraggingId] = useState(null) // id of the card being dragged
   const [overColumn, setOverColumn] = useState(null) // column the card is hovering over
+  const [deleting, setDeleting] = useState(false)
   const toast = useToast()
+
+  // Which pop-up is open: null (none), { type: 'create' },
+  // { type: 'edit', task } or { type: 'delete', task }
+  const [modal, setModal] = useState(null)
 
   // When the page opens, load the projects and select the first one
   useEffect(() => {
@@ -59,14 +63,41 @@ function Kanban() {
     if (projectId) loadTasks(projectId)
   }, [projectId])
 
+  // ---------- Create ----------
   async function handleCreate(values) {
     await api.post('/projects/' + projectId + '/tasks', values)
     await loadTasks(projectId)
-    setShowForm(false)
+    setModal(null)
     toast.success('Task added')
   }
 
-  // Moves a task to another column. Used by BOTH the drop and the card menu.
+  // ---------- Edit ----------
+  // Sends the changed fields. The server replies with the updated task,
+  // which replaces the old one in our list.
+  async function handleUpdate(taskId, values) {
+    const res = await api.patch('/tasks/' + taskId, values)
+    setTasks((old) => old.map((t) => (t.id === taskId ? res.data : t)))
+    setModal(null)
+    toast.success('Changes saved')
+  }
+
+  // ---------- Delete ----------
+  async function handleDelete(task) {
+    setDeleting(true)
+    try {
+      await api.delete('/tasks/' + task.id)
+      setTasks((old) => old.filter((t) => t.id !== task.id)) // remove it from the board
+      setModal(null)
+      toast.success('Task deleted')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not delete the task')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // ---------- Move to another column ----------
+  // Used by BOTH the drop and the card menu.
   async function handleStatusChange(taskId, newStatus) {
     const task = tasks.find((t) => t.id === taskId)
     if (!task || task.status === newStatus) return // nothing to do
@@ -122,7 +153,6 @@ function Kanban() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Our own dropdown, so the highlight is orange and not the browser's blue */}
           <Select
             className="max-w-full sm:max-w-xs"
             value={projectId}
@@ -132,7 +162,7 @@ function Kanban() {
           />
 
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => setModal({ type: 'create' })}
             className="rounded-full bg-clay px-5 py-2.5 font-semibold text-paper transition hover:bg-clay-dark active:scale-95"
           >
             + New task
@@ -187,6 +217,7 @@ function Kanban() {
                       task={t}
                       dragging={draggingId === t.id}
                       onStatusChange={handleStatusChange}
+                      onEdit={(task) => setModal({ type: 'edit', task })}
                       onDragStart={setDraggingId}
                       onDragEnd={() => {
                         setDraggingId(null)
@@ -201,13 +232,60 @@ function Kanban() {
         })}
       </div>
 
-      {/* ---------- "New task" pop-up ---------- */}
-      {showForm && (
+      {/* ---------- Pop-ups ---------- */}
+
+      {/* New task */}
+      {modal?.type === 'create' && (
         <Modal
           title={'New task in ' + (currentProject ? currentProject.title : 'project')}
-          onClose={() => setShowForm(false)}
+          onClose={() => setModal(null)}
         >
-          <TaskForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />
+          <TaskForm onSubmit={handleCreate} onCancel={() => setModal(null)} />
+        </Modal>
+      )}
+
+      {/* Edit task: the same form, starting with this task's values */}
+      {modal?.type === 'edit' && (
+        <Modal title="Edit task" onClose={() => setModal(null)}>
+          <TaskForm
+            initialValues={{
+              title: modal.task.title,
+              description: modal.task.description || '',
+              priority: modal.task.priority,
+              // The server sends a full timestamp. The date input wants just YYYY-MM-DD.
+              dueDate: modal.task.dueDate ? modal.task.dueDate.slice(0, 10) : '',
+            }}
+            onSubmit={(values) => handleUpdate(modal.task.id, values)}
+            onCancel={() => setModal(null)}
+            onDelete={() => setModal({ type: 'delete', task: modal.task })}
+            submitLabel="Save changes"
+          />
+        </Modal>
+      )}
+
+            {/* Delete confirmation */}
+      {modal?.type === 'delete' && (
+        <Modal title="Delete this task?" onClose={() => setModal(null)}>
+          <p className="text-muted break-words">
+            <span className="font-medium text-ink">{modal.task.title}</span> will be
+            permanently deleted. This cannot be undone.
+          </p>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              onClick={() => setModal(null)}
+              className="rounded-full border border-sand px-5 py-2 font-medium transition-colors hover:border-ink"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDelete(modal.task)}
+              disabled={deleting}
+              className="rounded-full bg-clay px-5 py-2 font-semibold text-paper transition hover:bg-clay-dark active:scale-95 disabled:opacity-60"
+            >
+              {deleting ? 'Deleting...' : 'Yes, delete'}
+            </button>
+          </div>
         </Modal>
       )}
     </div>
