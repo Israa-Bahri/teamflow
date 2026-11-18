@@ -1,23 +1,21 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
+import { Field } from './Field'
 
-// Props (inputs from the parent page):
-//   initialValues  = what the inputs start with (empty for create, the project for edit)
-//   onSubmit       = function to run with the values when the form is saved
-//   onCancel       = optional: shows a Cancel button
-//   submitLabel    = text on the save button
-//   resetOnSuccess = clear the inputs after saving (used for create)
+// The form inside the pop-up, used for both creating and editing.
+// Props: initialValues (empty for create, the project for edit),
+// onSubmit (what saving does), onCancel, submitLabel (text on the save button).
 function ProjectForm({
   initialValues = { title: '', description: '' },
   onSubmit,
   onCancel,
   submitLabel = 'Save',
-  resetOnSuccess = false,
 }) {
   const [values, setValues] = useState(initialValues)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const descriptionId = useId() // links the description label to its textarea
 
-  // Updates whichever input changed (controlled inputs)
+  // Updates whichever input changed
   function handleChange(e) {
     setValues({ ...values, [e.target.name]: e.target.value })
   }
@@ -27,55 +25,69 @@ function ProjectForm({
     setError('')
 
     if (!values.title.trim()) {
-      return setError('Title is required')
+      return setError('Please give your project a title')
     }
 
     setSaving(true)
     try {
-      await onSubmit(values) // the parent decides what saving means
-      if (resetOnSuccess) setValues({ title: '', description: '' })
+      await onSubmit(values) // on success the parent closes the pop-up
     } catch (err) {
       setError(err.response?.data?.error || 'Could not save the project')
-    } finally {
       setSaving(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {error && <p className="bg-red-100 text-red-700 rounded px-3 py-2 text-sm">{error}</p>}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <p className="page-enter rounded-xl bg-clay/10 px-4 py-3 text-sm text-clay-dark">
+          {error}
+        </p>
+      )}
 
-      <input
+      {/* autoFocus puts the cursor in the title as soon as the pop-up opens.
+          maxLength matches the limits our server enforces. */}
+      <Field
+        label="Title"
         name="title"
-        placeholder="Project title"
+        placeholder="e.g. Website redesign"
         value={values.title}
         onChange={handleChange}
-        className="w-full border rounded px-3 py-2"
-      />
-      <textarea
-        name="description"
-        placeholder="Description (optional)"
-        value={values.description}
-        onChange={handleChange}
-        rows={2}
-        className="w-full border rounded px-3 py-2"
+        maxLength={100}
+        autoFocus
       />
 
-      <div className="flex gap-2">
+      <div>
+        <label htmlFor={descriptionId} className="block text-sm font-medium mb-1.5">
+          Description <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <textarea
+          id={descriptionId}
+          name="description"
+          rows={3}
+          placeholder="What is this project about?"
+          value={values.description}
+          onChange={handleChange}
+          maxLength={1000}
+          className="w-full rounded-xl border border-sand bg-paper px-4 py-3 transition-colors focus:border-clay"
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full border border-sand px-5 py-2 font-medium transition-colors hover:border-ink"
+        >
+          Cancel
+        </button>
         <button
           type="submit"
           disabled={saving}
-          className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
+          className="rounded-full bg-clay px-5 py-2 font-semibold text-paper transition hover:bg-clay-dark active:scale-95 disabled:opacity-60"
         >
           {saving ? 'Saving...' : submitLabel}
         </button>
-
-        {/* Cancel button appears only when a parent gives us onCancel */}
-        {onCancel && (
-          <button type="button" onClick={onCancel} className="bg-slate-200 rounded px-4 py-2">
-            Cancel
-          </button>
-        )}
       </div>
     </form>
   )

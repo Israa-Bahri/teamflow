@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react'
 import api from '../api/client'
+import { useToast } from '../context/ToastContext'
+import Modal from '../components/Modal'
 import ProjectForm from '../components/ProjectForm'
 import { Loading, ErrorBox, EmptyState } from '../components/StatusMessages'
+
+// Each card gets a colored initial badge. The colors take turns.
+const BADGES = [
+  'bg-clay/15 text-clay-dark',
+  'bg-teal/15 text-teal',
+  'bg-honey/30 text-ink',
+]
 
 function Projects() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editingId, setEditingId] = useState(null)
-  const [notice, setNotice] = useState(null) // { type: 'success' | 'error', text }
+  const [deleting, setDeleting] = useState(false)
+  const toast = useToast()
+
+  // Which pop-up is open: null (none), { type: 'create' },
+  // { type: 'edit', project } or { type: 'delete', project }
+  const [modal, setModal] = useState(null)
 
   async function loadProjects() {
     try {
@@ -26,36 +39,33 @@ function Projects() {
     loadProjects()
   }, [])
 
+  // Each handler below sends the request, reloads the list, closes the pop-up
+  // and shows a toast. If the request fails, the form shows the error itself.
   async function handleCreate(values) {
-    setNotice(null)
     await api.post('/projects', values)
     await loadProjects()
+    setModal(null)
+    toast.success('Project created')
   }
 
   async function handleUpdate(id, values) {
-    setNotice(null)
     await api.patch('/projects/' + id, values)
-    setEditingId(null)
     await loadProjects()
+    setModal(null)
+    toast.success('Changes saved')
   }
 
   async function handleDelete(project) {
-    setNotice(null)
-
-    const ok = window.confirm(
-      'Delete "' + project.title + '"? Its tasks will be deleted too. This cannot be undone.'
-    )
-    if (!ok) return
-
+    setDeleting(true)
     try {
       await api.delete('/projects/' + project.id)
-      setNotice({ type: 'success', text: '"' + project.title + '" was deleted' })
       await loadProjects()
+      setModal(null)
+      toast.success('"' + project.title + '" was deleted')
     } catch (err) {
-      setNotice({
-        type: 'error',
-        text: err.response?.data?.error || 'Could not delete the project',
-      })
+      toast.error(err.response?.data?.error || 'Could not delete the project')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -63,76 +73,135 @@ function Projects() {
   if (error) return <ErrorBox message={error} />
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Projects</h1>
+    <div className="space-y-8">
+      {/* ---------- Header ---------- */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">Projects</h1>
+          <p className="text-muted">
+            {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+          </p>
+        </div>
 
-      {notice && (
-        <p
-          className={
-            'rounded px-3 py-2 text-sm break-words ' +
-            (notice.type === 'success'
-              ? 'bg-green-100 text-green-700'
-              : 'bg-red-100 text-red-700')
-          }
+        <button
+          onClick={() => setModal({ type: 'create' })}
+          className="rounded-full bg-clay px-5 py-2.5 font-semibold text-paper transition hover:bg-clay-dark active:scale-95"
         >
-          {notice.text}
-        </p>
-      )}
-
-      <div className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-3">New project</h2>
-        <ProjectForm onSubmit={handleCreate} submitLabel="Create project" resetOnSuccess />
+          + New project
+        </button>
       </div>
 
+      {/* ---------- Cards or empty state ---------- */}
       {projects.length === 0 ? (
         <EmptyState
           title="No projects yet"
-          message="Create your first one using the form above."
+          message="A project is a home for related tasks. Start with your first one."
+          actionLabel="Create a project"
+          onAction={() => setModal({ type: 'create' })}
         />
       ) : (
-        <ul className="space-y-3">
-          {projects.map((p) => (
-            <li key={p.id} className="bg-white rounded shadow p-4">
-              {editingId === p.id ? (
-                <ProjectForm
-                  initialValues={{ title: p.title, description: p.description || '' }}
-                  onSubmit={(values) => handleUpdate(p.id, values)}
-                  onCancel={() => setEditingId(null)}
-                  submitLabel="Save changes"
-                />
-              ) : (
-                // On phones the buttons go BELOW the text (flex-col);
-                // from the "sm" size up they sit beside it (sm:flex-row).
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                  {/* min-w-0 + break-words stop a long title from stretching the card */}
-                  <div className="min-w-0 break-words">
-                    <h2 className="font-semibold">{p.title}</h2>
-                    {p.description && <p className="text-slate-500">{p.description}</p>}
-                    <p className="text-xs text-slate-400 mt-2">
-                      Created {new Date(p.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {projects.map((p, index) => (
+            // "group" lets the buttons inside react when the whole card is hovered
+            <li
+              key={p.id}
+              className="group flex flex-col rounded-2xl border border-sand bg-paper p-5 transition duration-200 hover:-translate-y-1 hover:border-clay/40 hover:shadow-lg hover:shadow-ink/10"
+            >
+              {/* Colored initial badge. index % 3 cycles through the three colors. */}
+              <div
+                className={
+                  'mb-4 grid h-10 w-10 place-items-center rounded-xl font-display text-lg font-semibold ' +
+                  BADGES[index % BADGES.length]
+                }
+              >
+                {p.title[0].toUpperCase()}
+              </div>
 
-                  {/* shrink-0 keeps the buttons from being squashed */}
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => setEditingId(p.id)}
-                      className="text-sm bg-slate-200 hover:bg-slate-300 rounded px-3 py-1"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(p)}
-                      className="text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded px-3 py-1"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
+              {/* break-words stops long words from stretching the card;
+                  line-clamp-3 cuts long descriptions after three lines */}
+              <h2 className="font-display text-xl font-semibold break-words">{p.title}</h2>
+              {p.description && (
+                <p className="mt-1 text-muted break-words line-clamp-3">{p.description}</p>
               )}
+
+              <p className="mt-3 text-xs text-muted">
+                Created{' '}
+                {new Date(p.createdAt).toLocaleDateString(undefined, {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </p>
+
+              {/* On desktop these fade in when you hover the card or tab to them.
+                  On phones they're always visible (no hover on touch screens). */}
+              <div className="mt-auto flex gap-2 pt-4 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                <button
+                  onClick={() => setModal({ type: 'edit', project: p })}
+                  className="rounded-full border border-sand px-4 py-1.5 text-sm font-medium transition-colors hover:border-ink"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => setModal({ type: 'delete', project: p })}
+                  className="rounded-full px-4 py-1.5 text-sm font-medium text-clay transition-colors hover:bg-clay/10"
+                >
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {/* ---------- Pop-ups ---------- */}
+      {modal?.type === 'create' && (
+        <Modal title="New project" onClose={() => setModal(null)}>
+          <ProjectForm
+            onSubmit={handleCreate}
+            onCancel={() => setModal(null)}
+            submitLabel="Create project"
+          />
+        </Modal>
+      )}
+
+      {modal?.type === 'edit' && (
+        <Modal title="Edit project" onClose={() => setModal(null)}>
+          <ProjectForm
+            initialValues={{
+              title: modal.project.title,
+              description: modal.project.description || '',
+            }}
+            onSubmit={(values) => handleUpdate(modal.project.id, values)}
+            onCancel={() => setModal(null)}
+            submitLabel="Save changes"
+          />
+        </Modal>
+      )}
+
+      {modal?.type === 'delete' && (
+        <Modal title="Delete this project?" onClose={() => setModal(null)}>
+          <p className="text-muted break-words">
+            <span className="font-medium text-ink">"{modal.project.title}"</span> and all of
+            its tasks will be permanently deleted. This can't be undone.
+          </p>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              onClick={() => setModal(null)}
+              className="rounded-full border border-sand px-5 py-2 font-medium transition-colors hover:border-ink"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDelete(modal.project)}
+              disabled={deleting}
+              className="rounded-full bg-clay px-5 py-2 font-semibold text-paper transition hover:bg-clay-dark active:scale-95 disabled:opacity-60"
+            >
+              {deleting ? 'Deleting...' : 'Yes, delete'}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   )

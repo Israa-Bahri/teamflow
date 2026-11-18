@@ -1,2 +1,84 @@
-/* Loads all of Tailwind's utility classes (p-4, text-xl, bg-blue-500, ...) */
-@import "tailwindcss"; 
+@import "tailwindcss";
+
+/* Our palette and fonts. Tailwind turns each name into classes, for example
+   --color-clay  ->  bg-clay, text-clay, border-clay
+   --font-display -> font-display */
+@theme {
+  --color-cream: #fbf6ee;   /* page background, like warm paper */
+  --color-paper: #fffdf8;   /* cards and panels */
+  --color-ink: #2b2118;     /* main text, a warm dark brown */
+  --color-muted: #7a6b5b;   /* secondary text */
+  --color-sand: #e8dcc8;    /* borders and dividers */
+  --color-clay: #c8553d;    /* main accent (terracotta orange) */
+  --color-clay-dark: #a8432e;
+  --color-teal: #2f6f6b;    /* success and "done" */
+  --color-honey: #e9b44c;   /* highlights and "in progress" */
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+}
+
+/* Browsers draw some controls themselves (the date picker, checkboxes...).
+   accent-color tells them to use our orange instead of the default blue. */
+:root {
+  accent-color: var(--color-clay);
+}
+
+/* The color you see when you select text with the mouse */
+::selection {
+  background: color-mix(in srgb, var(--color-clay) 25%, transparent);
+}
+
+/* Base look of the whole page */
+body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+/* A clear outline when you move around with the keyboard */
+:focus-visible {
+  outline: 2px solid var(--color-clay);
+  outline-offset: 2px;
+}
+
+/* ---------- Animations used across the app ---------- */
+
+/* A page fades and rises a little when you open it */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: page-enter 0.3s ease-out; }
+
+/* A toast slides in from the right */
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.toast-enter { animation: toast-enter 0.25s ease-out; }
+
+/* Pop-up forms: dark backdrop fades in, the box pops up */
+@keyframes overlay-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.overlay-enter { animation: overlay-enter 0.2s ease-out; }
+
+@keyframes modal-enter {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-enter { animation: modal-enter 0.22s ease-out; }
+
+/* Respect people who turn animations off in their system settings */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

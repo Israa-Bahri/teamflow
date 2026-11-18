@@ -1,16 +1,26 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
+import { Field } from './Field'
 
-// A form for creating a task. The parent page decides what "submit" does
-// by passing in the onSubmit function.
-function TaskForm({ onSubmit }) {
-  // What the inputs look like when empty. The priority starts at MEDIUM.
-  const empty = { title: '', description: '', priority: 'MEDIUM', dueDate: '' }
+const PRIORITIES = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+]
 
-  const [values, setValues] = useState(empty)
+// The form inside the "New task" pop-up.
+// Props: onSubmit (what saving does), onCancel (closes the pop-up).
+function TaskForm({ onSubmit, onCancel }) {
+  const [values, setValues] = useState({
+    title: '',
+    description: '',
+    priority: 'MEDIUM', // new tasks start at medium priority
+    dueDate: '',
+  })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const descriptionId = useId()
 
-  // Updates whichever input changed (controlled inputs)
+  // Updates whichever input changed
   function handleChange(e) {
     setValues({ ...values, [e.target.name]: e.target.value })
   }
@@ -20,71 +30,99 @@ function TaskForm({ onSubmit }) {
     setError('')
 
     if (!values.title.trim()) {
-      return setError('Title is required')
+      return setError('Please give your task a title')
     }
 
     setSaving(true)
     try {
-      await onSubmit(values) // the parent sends it to the server
-      setValues(empty)       // clear the form after saving
+      await onSubmit(values) // on success the parent closes the pop-up
     } catch (err) {
       setError(err.response?.data?.error || 'Could not save the task')
-    } finally {
       setSaving(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {error && <p className="bg-red-100 text-red-700 rounded px-3 py-2 text-sm">{error}</p>}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <p className="page-enter rounded-xl bg-clay/10 px-4 py-3 text-sm text-clay-dark">
+          {error}
+        </p>
+      )}
 
-      <input
+      <Field
+        label="Title"
         name="title"
-        placeholder="Task title"
+        placeholder="e.g. Write the intro section"
         value={values.title}
         onChange={handleChange}
-        className="w-full border rounded px-3 py-2"
+        maxLength={100}
+        autoFocus
       />
 
-      <textarea
-        name="description"
-        placeholder="Description (optional)"
-        value={values.description}
-        onChange={handleChange}
-        rows={2}
-        className="w-full border rounded px-3 py-2"
-      />
-
-      <div className="flex gap-3 flex-wrap">
-        {/* A dropdown. The values match what the server accepts. */}
-        <select
-          name="priority"
-          value={values.priority}
+      <div>
+        <label htmlFor={descriptionId} className="block text-sm font-medium mb-1.5">
+          Description <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <textarea
+          id={descriptionId}
+          name="description"
+          rows={3}
+          placeholder="Any details to remember?"
+          value={values.description}
           onChange={handleChange}
-          className="border rounded px-3 py-2"
-        >
-          <option value="LOW">Low priority</option>
-          <option value="MEDIUM">Medium priority</option>
-          <option value="HIGH">High priority</option>
-        </select>
-
-        {/* type="date" gives a calendar picker and sends text like 2026-12-01 */}
-        <input
-          type="date"
-          name="dueDate"
-          value={values.dueDate}
-          onChange={handleChange}
-          className="border rounded px-3 py-2"
+          maxLength={1000}
+          className="w-full rounded-xl border border-sand bg-paper px-4 py-3 transition-colors focus:border-clay"
         />
       </div>
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
-      >
-        {saving ? 'Adding...' : 'Add task'}
-      </button>
+      {/* Priority: three pill buttons. The selected one is filled in terracotta. */}
+      <div>
+        <span className="block text-sm font-medium mb-1.5">Priority</span>
+        <div role="group" aria-label="Priority" className="flex gap-2">
+          {PRIORITIES.map((p) => (
+            <button
+              type="button" // so clicking doesn't submit the form
+              key={p.value}
+              aria-pressed={values.priority === p.value}
+              onClick={() => setValues({ ...values, priority: p.value })}
+              className={
+                'rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ' +
+                (values.priority === p.value
+                  ? 'border-clay bg-clay text-paper'
+                  : 'border-sand hover:border-ink')
+              }
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Field
+        label="Due date (optional)"
+        type="date"
+        name="dueDate"
+        value={values.dueDate}
+        onChange={handleChange}
+      />
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full border border-sand px-5 py-2 font-medium transition-colors hover:border-ink"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-full bg-clay px-5 py-2 font-semibold text-paper transition hover:bg-clay-dark active:scale-95 disabled:opacity-60"
+        >
+          {saving ? 'Adding...' : 'Add task'}
+        </button>
+      </div>
     </form>
   )
 }
